@@ -1,4 +1,4 @@
-import flappy_bird.game.wrapped_flappy_bird as game
+import game.wrapped_flappy_bird as game
 import numpy as np
 from agent import Agent
 

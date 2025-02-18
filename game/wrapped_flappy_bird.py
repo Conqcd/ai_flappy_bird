@@ -1,6 +1,6 @@
 import random
 import pygame
-from flappy_bird.game import flappy_bird_utils
+from game import flappy_bird_utils
 from itertools import cycle
 
 FPS = 30
