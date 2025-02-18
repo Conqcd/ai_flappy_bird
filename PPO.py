@@ -9,10 +9,10 @@ from fbenv import FlappyBirdEnv
 class PolicyNetwork(nn.Module):
     def __init__(self, action_dim):
         super(PolicyNetwork, self).__init__()
-        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4, padding_mode= Same)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=2, stride=1)
-        self.pool1 = nn.MaxPool2d(2, 2)
+        self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4, padding=1, padding_mode='replicate')
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate')
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=2, stride=1, padding=1, padding_mode='replicate')
+        self.pool1 = nn.MaxPool2d(2, 2, padding=1)
         self.fc1 = nn.Linear(1600, 512)
         self.fc2 = nn.Linear(512, action_dim)
 
@@ -52,7 +52,7 @@ def compute_returns(rewards, gamma):
         returns.insert(0, R)
     return returns
 
-def ppo_update(policy_net, value_net, optimizer_policy, optimizer_value, states, actions, log_probs, returns, advantages, clip_epsilon=0.2):
+def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2):
     for _ in range(10):  # Update for 10 epochs
         new_log_probs = policy_net(states).gather(1, actions.unsqueeze(1)).log()
         ratio = new_log_probs / log_probs
@@ -65,13 +65,10 @@ def ppo_update(policy_net, value_net, optimizer_policy, optimizer_value, states,
         categorical_dist = dist.Categorical(probs=torch.tensor([0.1, 0.2, 0.3, 0.4]))
         entropy_categorical = categorical_dist.entropy()
 
-        optimizer_policy.zero_grad()
-        policy_loss.backward()
-        optimizer_policy.step()
+        optimizer.zero_grad()
+        (policy_loss + value_loss).backward()
+        optimizer.step()
 
-        optimizer_value.zero_grad()
-        value_loss.backward()
-        optimizer_value.step()
 
 def main():
     env = FlappyBirdEnv()
@@ -92,8 +89,8 @@ def main():
     else:
         policy_net = PolicyNetwork(state_dim, action_dim).to(device)
         value_net = ValueNetwork(state_dim).to(device)
-    optimizer_policy = optim.Adam(policy_net.parameters(), lr=1e-3)
-    optimizer_value = optim.Adam(value_net.parameters(), lr=1e-3)
+    params = list(policy_net.parameters()) + list(value_net.parameters())
+    optimizer = optim.Adam(params, lr=1e-3)
 
     max_episodes = 10000
     gamma = 0.99
@@ -126,10 +123,12 @@ def main():
         log_probs = torch.stack(log_probs)
         advantages = returns - value_net(states).detach()
 
-        ppo_update(policy_net, value_net, optimizer_policy, optimizer_value, states, actions, log_probs, returns, advantages)
+        ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages)
 
         if episode % 10 == 0:
             print(f'Episode {episode}, Return: {sum(rewards)}')
+            torch.save(policy_net, save_actor_path)
+            torch.save(value_net,save_critic_path)
 
 if __name__ == '__main__':
     main()
