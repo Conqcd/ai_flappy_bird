@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
+from fbenv import FlappyBirdEnv
 
 class PolicyNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -54,7 +55,11 @@ def ppo_update(policy_net, value_net, optimizer_policy, optimizer_value, states,
         optimizer_value.step()
 
 def main():
-    env = gym.make('CartPole-v1')
+    env = FlappyBirdEnv()
+    state = env.reset()
+    done = False
+
+
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
 
