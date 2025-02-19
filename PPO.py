@@ -11,7 +11,7 @@ class PolicyNetwork(nn.Module):
         super(PolicyNetwork, self).__init__()
         self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4, padding=1, padding_mode='replicate')
         self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate')
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=2, stride=1, padding=1, padding_mode='replicate')
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, padding_mode='replicate')
         self.pool1 = nn.MaxPool2d(2, 2, padding=1)
         self.fc1 = nn.Linear(1600, 512)
         self.fc2 = nn.Linear(512, action_dim)
@@ -20,7 +20,7 @@ class PolicyNetwork(nn.Module):
         x = self.pool1(torch.relu(self.conv1(x)))
         x = torch.relu(self.conv2(x))
         x = torch.relu(self.conv3(x))
-        x.view(-1,1600)
+        x = x.view(-1,1600)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return torch.softmax(x, dim=-1)
@@ -30,7 +30,7 @@ class ValueNetwork(nn.Module):
         super(ValueNetwork, self).__init__()
         self.conv1 = nn.Conv2d(4, 32, kernel_size=8, stride=4, padding=1, padding_mode='replicate')
         self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, padding_mode='replicate')
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=2, stride=1, padding=1, padding_mode='replicate')
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, padding_mode='replicate')
         self.pool1 = nn.MaxPool2d(2, 2, padding=1)
         self.fc1 = nn.Linear(1600, 512)
         self.fc2 = nn.Linear(512, action_dim)
@@ -39,7 +39,7 @@ class ValueNetwork(nn.Module):
         x = self.pool1(torch.relu(self.conv1(x)))
         x = torch.relu(self.conv2(x))
         x = torch.relu(self.conv3(x))
-        x.view(-1,1600)
+        x = x.view(-1,1600)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x
@@ -87,8 +87,8 @@ def main():
         policy_net = torch.load(save_actor_path, map_location = device)
         value_net = torch.load(save_critic_path, map_location = device)
     else:
-        policy_net = PolicyNetwork(state_dim, action_dim).to(device)
-        value_net = ValueNetwork(state_dim).to(device)
+        policy_net = PolicyNetwork(action_dim).to(device)
+        value_net = ValueNetwork(action_dim).to(device)
     params = list(policy_net.parameters()) + list(value_net.parameters())
     optimizer = optim.Adam(params, lr=1e-3)
 
@@ -101,7 +101,7 @@ def main():
 
         done = False
         while not done:
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).to(device)
             action_probs = policy_net(state_tensor)
             dist = Categorical(action_probs)
             action = dist.sample()
@@ -117,8 +117,8 @@ def main():
             state = next_state
 
         returns = compute_returns(rewards, gamma)
-        returns = torch.FloatTensor(returns)
-        states = torch.FloatTensor(states)
+        returns = torch.FloatTensor(returns).to(device)
+        states = torch.FloatTensor(states).permute(0, 3, 1, 2).to(device)
         actions = torch.LongTensor(actions)
         log_probs = torch.stack(log_probs)
         advantages = returns - value_net(states).detach()
