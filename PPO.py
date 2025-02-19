@@ -20,7 +20,7 @@ class PolicyNetwork(nn.Module):
         x = self.pool1(torch.relu(self.conv1(x)))
         x = torch.relu(self.conv2(x))
         x = torch.relu(self.conv3(x))
-        x = x.view(-1,1600)
+        x = x.reshape(-1,1600)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return torch.softmax(x, dim=-1)
@@ -39,7 +39,7 @@ class ValueNetwork(nn.Module):
         x = self.pool1(torch.relu(self.conv1(x)))
         x = torch.relu(self.conv2(x))
         x = torch.relu(self.conv3(x))
-        x = x.view(-1,1600)
+        x = x.reshape(-1,1600)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x
@@ -53,20 +53,26 @@ def compute_returns(rewards, gamma):
     return returns
 
 def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2):
+    wa = 1
+    wv = 1
+    we = 0.01
     for _ in range(10):  # Update for 10 epochs
-        new_log_probs = policy_net(states).gather(1, actions.unsqueeze(1)).log()
-        ratio = new_log_probs / log_probs
+        action_probs = policy_net(states)
+        two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
+        dist = Categorical(two_probs)
+        new_log_probs = dist.log_prob(actions)
+        entropy = dist.entropy().sum(-1).mean()
+
+        ratio = torch.exp(new_log_probs / log_probs)
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - clip_epsilon, 1.0 + clip_epsilon) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
 
         value_loss = (returns - value_net(states)).pow(2).mean()
 
-        categorical_dist = dist.Categorical(probs=torch.tensor([0.1, 0.2, 0.3, 0.4]))
-        entropy_categorical = categorical_dist.entropy()
 
         optimizer.zero_grad()
-        (policy_loss + value_loss).backward()
+        (policy_loss * wa + value_loss * wv - entropy * we).backward()
         optimizer.step()
 
 
@@ -102,8 +108,10 @@ def main():
         done = False
         while not done:
             state_tensor = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).to(device)
-            action_probs = policy_net(state_tensor)
-            dist = Categorical(action_probs)
+            with torch.no_grad():
+                action_probs = policy_net(state_tensor)
+            two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
+            dist = Categorical(two_probs)
             action = dist.sample()
             log_prob = dist.log_prob(action)
 
