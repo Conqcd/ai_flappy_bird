@@ -77,10 +77,8 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
 
         value_loss = (returns - value_net(states)).pow(2).mean()
 
-        print(entropy.detach().cpu().numpy())
-
         optimizer.zero_grad()
-        loss = policy_loss * wa + value_loss * wv + entropy * we
+        loss = value_loss * wv - entropy * we + policy_loss * wa
         print(loss.detach().cpu().numpy())
         loss.backward()
         nn.utils.clip_grad_norm_(
@@ -109,7 +107,7 @@ def main():
         policy_net = PolicyNetwork(action_dim).to(device)
         value_net = ValueNetwork(action_dim).to(device)
     params = list(policy_net.parameters()) + list(value_net.parameters())
-    optimizer = optim.Adam(params, lr=1e-3)
+    optimizer = optim.Adam(params, lr=1e-4)
 
     max_episodes = 10000
     gamma = 0.99
