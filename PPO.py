@@ -23,7 +23,7 @@ class PolicyNetwork(nn.Module):
         x = x.reshape(-1,1600)
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
-        return torch.softmax(x, dim=-1)
+        return torch.sigmoid(x)
 
 class ValueNetwork(nn.Module):
     def __init__(self, action_dim):
