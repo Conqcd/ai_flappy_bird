@@ -51,35 +51,41 @@ def compute_returns(rewards, values, gamma, gae_lambda):
     for r,v in reversed(list(zip(rewards,values))):
         if(len(returns) == 0):
             delta = r
-            gae = delta
+            gae = delta - v
         else:
             delta = r + gamma * last_value - v
-            gae = delta + gamma * gae_lambda * gae + v
+            gae = delta + gamma * gae_lambda * gae
         last_value = v
-        returns.insert(0, gae)
+        returns.insert(0, gae + v)
     return returns
 
-def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2):
+def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2,max_grad_norm=1.0):
     wa = 1
     wv = 1
-    we = 0.01
+    we = 0.5
     for _ in range(10):  # Update for 10 epochs
         action_probs = policy_net(states)
         two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
         dist = Categorical(two_probs)
-        new_log_probs = dist.log_prob(actions)
+        new_log_probs = dist.log_prob(actions).unsqueeze(1)
         entropy = dist.entropy().sum(-1).mean()
 
-        ratio = torch.exp(new_log_probs / log_probs)
+        ratio = torch.exp(new_log_probs - log_probs)
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - clip_epsilon, 1.0 + clip_epsilon) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
 
         value_loss = (returns - value_net(states)).pow(2).mean()
 
+        print(entropy.detach().cpu().numpy())
 
         optimizer.zero_grad()
-        (policy_loss * wa + value_loss * wv - entropy * we).backward()
+        loss = policy_loss * wa + value_loss * wv + entropy * we
+        print(loss.detach().cpu().numpy())
+        loss.backward()
+        nn.utils.clip_grad_norm_(
+            policy_net.parameters(), max_grad_norm
+        )
         optimizer.step()
 
 
@@ -120,6 +126,7 @@ def main():
                 action_probs = policy_net(state_tensor)
                 value = value_net(state_tensor).detach()
             two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
+            print(two_probs.detach().cpu().numpy())
             dist = Categorical(two_probs)
             action = dist.sample()
             log_prob = dist.log_prob(action)
@@ -135,7 +142,7 @@ def main():
             state = next_state
 
         returns = compute_returns(rewards, values, gamma, gae_lambda)
-        returns = torch.FloatTensor(returns).to(device)
+        returns = torch.FloatTensor(returns).to(device).unsqueeze(1)
         states = torch.FloatTensor(states).permute(0, 3, 1, 2).to(device)
         actions = torch.LongTensor(actions).to(device)
         log_probs = torch.stack(log_probs)
