@@ -44,12 +44,19 @@ class ValueNetwork(nn.Module):
         x = self.fc2(x)
         return x
 
-def compute_returns(rewards, gamma):
+def compute_returns(rewards, values, gamma, gae_lambda):
     returns = []
-    R = 0
-    for r in reversed(rewards):
-        R = r + gamma * R
-        returns.insert(0, R)
+    gae = 0
+    last_value = values[-1]
+    for r,v in reversed(list(zip(rewards,values))):
+        if(len(returns) == 0):
+            delta = r
+            gae = delta
+        else:
+            delta = r + gamma * last_value - v
+            gae = delta + gamma * gae_lambda * gae + v
+        last_value = v
+        returns.insert(0, gae)
     return returns
 
 def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2):
@@ -100,16 +107,18 @@ def main():
 
     max_episodes = 10000
     gamma = 0.99
+    gae_lambda = 0.99
 
     for episode in range(max_episodes):
         state = env.reset()
-        states, actions, rewards, log_probs = [], [], [], []
+        states, actions, rewards, log_probs, values = [], [], [], [], []
 
         done = False
         while not done:
             state_tensor = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).to(device)
             with torch.no_grad():
                 action_probs = policy_net(state_tensor)
+                value = value_net(state_tensor).detach()
             two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
             dist = Categorical(two_probs)
             action = dist.sample()
@@ -121,15 +130,17 @@ def main():
             actions.append(action)
             rewards.append(reward)
             log_probs.append(log_prob)
+            values.append(value)
 
             state = next_state
 
-        returns = compute_returns(rewards, gamma)
+        returns = compute_returns(rewards, values, gamma, gae_lambda)
         returns = torch.FloatTensor(returns).to(device)
         states = torch.FloatTensor(states).permute(0, 3, 1, 2).to(device)
-        actions = torch.LongTensor(actions)
+        actions = torch.LongTensor(actions).to(device)
         log_probs = torch.stack(log_probs)
-        advantages = returns - value_net(states).detach()
+        values = torch.stack(values).squeeze(1)
+        advantages = returns - values
 
         ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages)
 
