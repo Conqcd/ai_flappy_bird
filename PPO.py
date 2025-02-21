@@ -89,9 +89,9 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
 
 def main():
     env = FlappyBirdEnv()
-    state = env.reset()
+    # state = env.reset()
     done = False
-    use_save = False
+    use_save = True
     save_actor_path = "actor.pth"
     save_critic_path = "critic.pth"
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -101,8 +101,8 @@ def main():
     action_dim = env.action_space.n
 
     if use_save:
-        policy_net = torch.load(save_actor_path, map_location = device)
-        value_net = torch.load(save_critic_path, map_location = device)
+        policy_net = torch.load(save_actor_path, map_location = device, weights_only=False)
+        value_net = torch.load(save_critic_path, map_location = device, weights_only=False)
     else:
         policy_net = PolicyNetwork(action_dim).to(device)
         value_net = ValueNetwork(action_dim).to(device)
@@ -152,7 +152,7 @@ def main():
         if episode % 10 == 0:
             print(f'Episode {episode}, Return: {sum(rewards)}')
             torch.save(policy_net, save_actor_path)
-            torch.save(value_net,save_critic_path)
+            torch.save(value_net, save_critic_path)
 
 if __name__ == '__main__':
     main()
