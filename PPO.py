@@ -85,7 +85,6 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
 
         optimizer.zero_grad()
         loss = value_loss * wv - entropy * we + policy_loss * wa
-        print(loss.detach().cpu().numpy())
         loss.backward()
         nn.utils.clip_grad_norm_(
             policy_net.parameters(), max_grad_norm
@@ -97,7 +96,7 @@ def main():
     env = FlappyBirdEnv()
     # state = env.reset()
     done = False
-    replay_buffer_size = 500
+    replay_buffer_size = 300
     use_save = True
     save_actor_path = "actor.pth"
     save_critic_path = "critic.pth"
@@ -152,6 +151,8 @@ def main():
             values.append(value)
 
             state = next_state
+
+            iter += 1
 
             if done and iter >= replay_buffer_size:
                 break
