@@ -68,12 +68,12 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
 
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
 
-    for _ in range(10):  # Update for 10 epochs
+    for _ in range(20):  # Update for 10 epochs
         action_probs = policy_net(states)
         two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
         dist = Categorical(two_probs)
         new_log_probs = dist.log_prob(actions).unsqueeze(1)
-        entropy = dist.entropy().sum(-1).mean()
+        entropy = dist.entropy().unsqueeze(1).sum(-1).mean()
 
         ratio = torch.exp(new_log_probs - log_probs)
         surr1 = ratio * advantages
@@ -85,6 +85,7 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
 
         optimizer.zero_grad()
         loss = value_loss * wv - entropy * we + policy_loss * wa
+        print(policy_loss.detach().cpu().numpy(), value_loss.detach().cpu().numpy(), entropy.detach().cpu().numpy(),loss.detach().cpu().numpy())
         loss.backward()
         nn.utils.clip_grad_norm_(
             policy_net.parameters(), max_grad_norm
@@ -96,7 +97,7 @@ def main():
     env = FlappyBirdEnv()
     # state = env.reset()
     done = False
-    replay_buffer_size = 300
+    replay_buffer_size = 2000
     use_save = True
     save_actor_path = "actor.pth"
     save_critic_path = "critic.pth"
@@ -134,10 +135,10 @@ def main():
             dist = Categorical(two_probs)
             action = dist.sample()
             log_prob = dist.log_prob(action)
-            print(two_probs.detach().cpu().numpy(),action.detach().cpu().numpy())
+            # print(two_probs.detach().cpu().numpy(),action.detach().cpu().numpy())
 
             next_state, reward, done, _ = env.step(action.item())
-
+            # print(reward)
             if done:
                 masks.append(False)
             else:
@@ -167,8 +168,9 @@ def main():
 
         ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages)
 
+        print(f'Episode {episode}, Return: {sum(rewards)}')
         if episode % 10 == 0:
-            print(f'Episode {episode}, Return: {sum(rewards)}')
+            # print(f'Episode {episode}, Return: {sum(rewards)}')
             torch.save(policy_net, save_actor_path)
             torch.save(value_net, save_critic_path)
 
