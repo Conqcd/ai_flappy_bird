@@ -44,18 +44,20 @@ class ValueNetwork(nn.Module):
         x = self.fc2(x)
         return x
 
-def compute_returns(rewards, values, gamma, gae_lambda):
+def compute_returns(rewards, values, gamma, gae_lambda, masks):
     returns = []
     gae = 0
     last_value = values[-1]
-    for r,v in reversed(list(zip(rewards,values))):
-        if(len(returns) == 0):
-            delta = r
-            gae = delta - v
-        else:
-            delta = r + gamma * last_value - v
-            gae = delta + gamma * gae_lambda * gae
+    last_mask = masks[-1]
+    for r,v,m in reversed(list(zip(rewards,values,masks))):
+        # if(len(returns) == 0):
+        #     delta = r
+        #     gae = delta - v
+        # else:
+        delta = r + gamma * last_value * m - v
+        gae = delta + gamma * gae_lambda * gae * m
         last_value = v
+        last_mask = m
         returns.insert(0, gae + v)
     return returns
 
@@ -95,6 +97,7 @@ def main():
     env = FlappyBirdEnv()
     # state = env.reset()
     done = False
+    replay_buffer_size = 500
     use_save = True
     save_actor_path = "actor.pth"
     save_critic_path = "critic.pth"
@@ -119,10 +122,11 @@ def main():
 
     for episode in range(max_episodes):
         state = env.reset()
-        states, actions, rewards, log_probs, values, probs = [], [], [], [], [], []
+        states, actions, rewards, log_probs, values, probs, masks = [], [], [], [], [], [], []
 
         done = False
-        while not done:
+        iter = 0
+        while True:
             state_tensor = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).to(device)
             with torch.no_grad():
                 action_probs = policy_net(state_tensor)
@@ -135,6 +139,11 @@ def main():
 
             next_state, reward, done, _ = env.step(action.item())
 
+            if done:
+                masks.append(False)
+            else:
+                masks.append(True)
+
             probs.append(two_probs)
             states.append(state)
             actions.append(action)
@@ -144,7 +153,10 @@ def main():
 
             state = next_state
 
-        returns = compute_returns(rewards, values, gamma, gae_lambda)
+            if done and iter >= replay_buffer_size:
+                break
+
+        returns = compute_returns(rewards, values, gamma, gae_lambda, masks)
         returns = torch.FloatTensor(returns).to(device).unsqueeze(1)
         states = torch.FloatTensor(states).permute(0, 3, 1, 2).to(device)
         actions = torch.LongTensor(actions).to(device)
