@@ -31,8 +31,8 @@ def play_game():
         print(r_t)
 
         # 如果crash，终止循环，当前程序会执行完，游戏等于就是结束了
-        if terminal:
-            break
+        # if terminal:
+        #     break
 
 
 def main():

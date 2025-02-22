@@ -121,6 +121,9 @@ class GameState:
             self.__init__()
             reward = -1
 
+        if self.playery <= 0:
+            reward = -1
+
         # draw sprites
         SCREEN.blit(IMAGES['background'], (0, 0))
 

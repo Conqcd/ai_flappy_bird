@@ -63,6 +63,9 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
     wa = 1
     wv = 1
     we = 0.001
+
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
+
     for _ in range(10):  # Update for 10 epochs
         action_probs = policy_net(states)
         two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
@@ -75,7 +78,8 @@ def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, ret
         surr2 = torch.clamp(ratio, 1.0 - clip_epsilon, 1.0 + clip_epsilon) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
 
-        value_loss = (returns - value_net(states)).pow(2).mean()
+        values = value_net(states)
+        value_loss = (returns - values).pow(2).mean()
 
         optimizer.zero_grad()
         loss = value_loss * wv - entropy * we + policy_loss * wa
@@ -109,13 +113,13 @@ def main():
     params = list(policy_net.parameters()) + list(value_net.parameters())
     optimizer = optim.AdamW(params, lr=1e-4, amsgrad=True,weight_decay=0.001)
 
-    max_episodes = 10000
+    max_episodes = 1000000
     gamma = 0.99
     gae_lambda = 0.99
 
     for episode in range(max_episodes):
         state = env.reset()
-        states, actions, rewards, log_probs, values = [], [], [], [], []
+        states, actions, rewards, log_probs, values, probs = [], [], [], [], [], []
 
         done = False
         while not done:
@@ -131,6 +135,7 @@ def main():
 
             next_state, reward, done, _ = env.step(action.item())
 
+            probs.append(two_probs)
             states.append(state)
             actions.append(action)
             rewards.append(reward)
