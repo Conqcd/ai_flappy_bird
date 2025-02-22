@@ -64,11 +64,11 @@ def compute_returns(rewards, values, gamma, gae_lambda, masks):
 def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2,max_grad_norm=1.0):
     wa = 1
     wv = 1
-    we = 0.001
+    we = 0.0005
 
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
 
-    for _ in range(20):  # Update for 10 epochs
+    for _ in range(25):  # Update for 10 epochs
         action_probs = policy_net(states)
         two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
         dist = Categorical(two_probs)
