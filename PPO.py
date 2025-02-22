@@ -64,9 +64,9 @@ def compute_returns(rewards, values, gamma, gae_lambda, masks):
 def ppo_update(policy_net, value_net, optimizer, states, actions, log_probs, returns, advantages, clip_epsilon=0.2,max_grad_norm=1.0):
     wa = 1
     wv = 1
-    we = 0.0005
+    we = 0.001
 
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
+    # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)
 
     for _ in range(25):  # Update for 10 epochs
         action_probs = policy_net(states)
@@ -97,7 +97,7 @@ def main():
     env = FlappyBirdEnv()
     # state = env.reset()
     done = False
-    replay_buffer_size = 2000
+    replay_buffer_size = 10000
     use_save = True
     save_actor_path = "actor.pth"
     save_critic_path = "critic.pth"

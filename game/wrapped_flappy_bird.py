@@ -77,7 +77,7 @@ class GameState:
             if pipeMidPos <= playerMidPos < pipeMidPos + 4:
                 self.score += 1
                 SOUNDS['point'].play()
-                reward = 10
+                reward = 100
 
         # playerIndex basex change
         if (self.loopIter + 1) % 3 == 0:
