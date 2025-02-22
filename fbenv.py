@@ -12,6 +12,8 @@ class FlappyBirdEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=255, shape=(80, 80, 4), dtype=np.uint8)
         self.s_t = None
 
+    def reset_image(self):
+        self.s_t = None
     def reset(self):
         self.game_state = game.GameState()
         x_t, _, _ = self.game_state.frame_step(np.array([1, 0]))
@@ -19,6 +21,7 @@ class FlappyBirdEnv(gym.Env):
         x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
         ret, x_t = cv2.threshold(x_t, 1, 255, cv2.THRESH_BINARY)
         x_t = self.image_to_frames(x_t)
+        self.s_t = None
         return x_t
 
     def step(self, action):

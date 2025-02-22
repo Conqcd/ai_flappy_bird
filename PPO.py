@@ -141,6 +141,7 @@ def main():
             # print(reward)
             if done:
                 masks.append(False)
+                env.reset_image()
             else:
                 masks.append(True)
 
