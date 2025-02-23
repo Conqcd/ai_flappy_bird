@@ -130,7 +130,7 @@ def main():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).permute(0, 3, 1, 2).to(device)
             with torch.no_grad():
                 action_probs = policy_net(state_tensor)
-                value = value_net(state_tensor).detach()
+                value = value_net(state_tensor)
             two_probs = torch.stack([action_probs[:,0], 1 - action_probs[:,0]], dim=1)
             dist = Categorical(two_probs)
             action = dist.sample()
