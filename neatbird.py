@@ -141,6 +141,7 @@ def run_game(genomes, config):
 
     pipes = [Pipe()]
     c_pipe = pipes[0]
+    f_pipe = pipes[0]
     clock = pygame.time.Clock()
     score = 0
     done = False
@@ -162,13 +163,16 @@ def run_game(genomes, config):
         if c_pipe.is_need_new():
             c_pipe = Pipe()
             pipes.append(c_pipe)
-
+        if f_pipe.x + f_pipe.width / 2 < birds[0].x:
+            f_pipe = c_pipe
+            score += 1
+            print(score)
         for pipe in pipes:
             pipe.move()
             if pipe.is_offscreen():
                 pipes.remove(pipe)
-                score += 1
-                print(score)
+                # score += 1
+                # print(score)
 
         # Check collisions
         for i, bird in enumerate(birds):
