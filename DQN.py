@@ -33,12 +33,13 @@ class DQNAgent:
         self.gamma = 0.99
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
-        self.epsilon_min = 0.005 # 0.01
+        self.epsilon_min = 0.01
         self.update_target_every = 10
         self.steps = 0
         if use_save:
             self.q_network = torch.load(self.save_dqn_path, map_location=device, weights_only=False)
-            self.epsilon = 0.05
+            self.epsilon = 0.01
+            self.epsilon_min = 0.001
         else:
             self.q_network = DQN(action_dim).to(device)
 
