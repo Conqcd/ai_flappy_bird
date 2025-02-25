@@ -28,8 +28,8 @@ class DQNAgent:
         self.action_dim = action_dim
         use_save = True
         self.save_dqn_path = "dqn.pth"
-        self.memory = deque(maxlen=10000)
-        self.batch_size = 64
+        self.memory = deque(maxlen=20000)
+        self.batch_size = 128
         self.gamma = 0.99
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
@@ -39,7 +39,7 @@ class DQNAgent:
         if use_save:
             self.q_network = torch.load(self.save_dqn_path, map_location=device, weights_only=False)
             self.epsilon = 0.01
-            self.epsilon_min = 0.001
+            self.epsilon_min = 0.0001
         else:
             self.q_network = DQN(action_dim).to(device)
 
@@ -112,6 +112,7 @@ def main():
             total_reward += reward
             rewards.append(reward)
 
+        agent.replay()
         agent.replay()
         print(f'Episode {episode}, Return: {sum(rewards)}')
 
