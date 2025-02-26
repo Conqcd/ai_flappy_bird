@@ -5,6 +5,7 @@ import random
 from pygame.locals import *
 from game import flappy_bird_utils
 from itertools import cycle
+import pickle
 
 FPS = 30
 # 游戏设置
@@ -18,7 +19,6 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Flappy Bird AI')
 
 IMAGES, SOUNDS, HITMASKS = flappy_bird_utils.load()
-PIPEGAPSIZE = 100  # gap between upper and lower part of pipe
 BASEY = SCREEN_HEIGHT * 0.79
 
 PLAYER_WIDTH = IMAGES['player'][0].get_width()
@@ -65,13 +65,15 @@ class Bird:
     def get_state(self, pipes):
         closest_pipe = None
         for pipe in pipes:
-            if pipe.x + pipe.width > self.x:
+            if (pipe.x + pipe.width) > self.x:
                 closest_pipe = pipe
                 break
         return closest_pipe
 
     def colision(self, pipe):
 
+        if self.y + self.height >= BASEY - 1:
+            return True
         uPipeRect = pygame.Rect(pipe.x, pipe.top - PIPE_HEIGHT, PIPE_WIDTH, PIPE_HEIGHT)
         lPipeRect = pygame.Rect(pipe.x, pipe.bottom, PIPE_WIDTH, PIPE_HEIGHT)
 
@@ -94,7 +96,13 @@ class Bird:
 class Pipe:
     def __init__(self):
         self.x = SCREEN_WIDTH
-        self.height = random.randint(100, 300)
+
+        gapYs = [20, 30, 40, 50, 60, 70, 80, 90]
+        index = random.randint(0, len(gapYs) - 1)
+        gapY = gapYs[index]
+
+        gapY += int(BASEY * 0.2)
+        self.height = gapY
         self.gap = GAP
         self.width = PIPE_WIDTH
         self.top = self.height
@@ -159,6 +167,10 @@ def run_game(genomes, config):
     f_pipe = pipes[0]
     clock = pygame.time.Clock()
     score = 0
+
+    basex = 0
+    baseShift = IMAGES['base'].get_width() - BACKGROUND_WIDTH
+
     done = False
 
     while not done:
@@ -178,7 +190,7 @@ def run_game(genomes, config):
         if c_pipe.is_need_new():
             c_pipe = Pipe()
             pipes.append(c_pipe)
-        if f_pipe.x + f_pipe.width / 2 < birds[0].x:
+        if (f_pipe.x + f_pipe.width / 2) < birds[0].x:
             f_pipe = c_pipe
             score += 1
         for pipe in pipes:
@@ -187,20 +199,31 @@ def run_game(genomes, config):
                 pipes.remove(pipe)
                 # score += 1
                 # print(score)
-
+        stateid = 0
+        id_to_delete = []
         # Check collisions
         for i, bird in enumerate(birds):
             state = bird.get_state(pipes)
+            if state:
+                stateid += 1
             if state and bird.colision(state):
+                id_to_delete.append(i)
                 ge[i].fitness -= 1
-                birds.pop(i)
-                ge.pop(i)
-                nets.pop(i)
+
+        for i in reversed(id_to_delete):
+            birds.pop(i)
+            ge.pop(i)
+            nets.pop(i)
+
+        # print(stateid)
         print(len(birds))
         if len(birds) == 0:
             done = True
 
         # 游戏画面更新
+
+        basex = -((-basex + 100) % baseShift)
+
         screen.fill((0, 0, 0))
         screen.blit(IMAGES['background'], (0, 0))
         for pipe in pipes:
@@ -211,10 +234,98 @@ def run_game(genomes, config):
             screen.blit(IMAGES['player'][bird.index],
                         (bird.x, bird.y))
 
+        screen.blit(IMAGES['base'], (basex, BASEY))
+
         showScore(score)
 
         pygame.display.update()
         clock.tick(FPS)
+
+    print("score:", score)
+
+
+def run_gamewithnet(net):
+
+    birds = [Bird()]
+    nets = [net]
+
+    pipes = [Pipe()]
+    c_pipe = pipes[0]
+    f_pipe = pipes[0]
+    clock = pygame.time.Clock()
+    score = 0
+
+    basex = 0
+    baseShift = IMAGES['base'].get_width() - BACKGROUND_WIDTH
+
+    done = False
+
+    while not done:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                done = True
+
+        for i, bird in enumerate(birds):
+            state = bird.get_state(pipes)
+            output = nets[i].activate((bird.y, state.top, state.bottom, state.x - bird.x))
+            if output[0] > 0:
+                bird.jump()
+
+            bird.move()
+
+        if c_pipe.is_need_new():
+            c_pipe = Pipe()
+            pipes.append(c_pipe)
+        if (f_pipe.x + f_pipe.width / 2) < birds[0].x:
+            f_pipe = c_pipe
+            score += 1
+        for pipe in pipes:
+            pipe.move()
+            if pipe.is_offscreen():
+                pipes.remove(pipe)
+                # score += 1
+                # print(score)
+        stateid = 0
+        id_to_delete = []
+        # Check collisions
+        for i, bird in enumerate(birds):
+            state = bird.get_state(pipes)
+            if state:
+                stateid += 1
+            if state and bird.colision(state):
+                id_to_delete.append(i)
+
+        for i in reversed(id_to_delete):
+            birds.pop(i)
+            nets.pop(i)
+
+        # print(stateid)
+        print(len(birds))
+        if len(birds) == 0:
+            done = True
+
+        # 游戏画面更新
+
+        basex = -((-basex + 100) % baseShift)
+
+        screen.fill((0, 0, 0))
+        screen.blit(IMAGES['background'], (0, 0))
+        for pipe in pipes:
+            screen.blit(IMAGES['pipe'][0], (pipe.x, pipe.top - PIPE_HEIGHT))
+            screen.blit(IMAGES['pipe'][1], (pipe.x, pipe.bottom))
+
+        for bird in birds:
+            screen.blit(IMAGES['player'][bird.index],
+                        (bird.x, bird.y))
+
+        screen.blit(IMAGES['base'], (basex, BASEY))
+
+        showScore(score)
+
+        pygame.display.update()
+        clock.tick(FPS)
+
+    print("score:", score)
 
 # 配置NEAT
 def run_neat(config_file):
@@ -226,8 +337,26 @@ def run_neat(config_file):
         config_file
     )
     population = neat.Population(config)
-    population.run(run_game, 50)  # Run for 50 generations
+    winner = population.run(run_game, 100)  # Run for 100 generations
+    with open('neat_bird.pkl', 'wb') as f:
+        pickle.dump(winner, f)
+
+
+def play_neat(config_path):
+    with open('neat_bird.pkl', 'rb') as f:
+        champion = pickle.load(f)
+
+    config = neat.Config(
+        neat.DefaultGenome,
+        neat.DefaultReproduction,
+        neat.DefaultSpeciesSet,
+        neat.DefaultStagnation,
+        config_path
+    )
+    net = neat.nn.FeedForwardNetwork.create(champion, config)
+    run_gamewithnet(net)
 
 if __name__ == "__main__":
     config_path = os.path.join(os.getcwd(), 'config-feedforward')  # Create your own NEAT config file
-    run_neat(config_path)
+    # run_neat(config_path)
+    play_neat(config_path)
