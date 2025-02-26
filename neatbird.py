@@ -65,7 +65,7 @@ class Bird:
     def get_state(self, pipes):
         closest_pipe = None
         for pipe in pipes:
-            if pipe.x > self.x:
+            if pipe.x + pipe.width > self.x:
                 closest_pipe = pipe
                 break
         return closest_pipe
@@ -116,7 +116,7 @@ def pixelCollision(rect1, rect2, hitmask1, hitmask2):
 
     if rect.width == 0 or rect.height == 0:
         return False
-    print(rect,rect1,rect2)
+    # print(rect,rect1,rect2)
     x1, y1 = rect.x - rect1.x, rect.y - rect1.y
     x2, y2 = rect.x - rect2.x, rect.y - rect2.y
 
@@ -125,6 +125,21 @@ def pixelCollision(rect1, rect2, hitmask1, hitmask2):
             if hitmask1[x1 + x][y1 + y] and hitmask2[x2 + x][y2 + y]:
                 return True
     return False
+
+
+def showScore(score):
+    """displays score in center of screen"""
+    scoreDigits = [int(x) for x in list(str(score))]
+    totalWidth = 0  # total width of all numbers to be printed
+
+    for digit in scoreDigits:
+        totalWidth += IMAGES['numbers'][digit].get_width()
+
+    Xoffset = (SCREEN_WIDTH - totalWidth) / 2
+
+    for digit in scoreDigits:
+        screen.blit(IMAGES['numbers'][digit], (Xoffset, SCREEN_HEIGHT * 0.1))
+        Xoffset += IMAGES['numbers'][digit].get_width()
 
 # 创建环境并运行
 def run_game(genomes, config):
@@ -166,7 +181,6 @@ def run_game(genomes, config):
         if f_pipe.x + f_pipe.width / 2 < birds[0].x:
             f_pipe = c_pipe
             score += 1
-            print(score)
         for pipe in pipes:
             pipe.move()
             if pipe.is_offscreen():
@@ -182,7 +196,7 @@ def run_game(genomes, config):
                 birds.pop(i)
                 ge.pop(i)
                 nets.pop(i)
-
+        print(len(birds))
         if len(birds) == 0:
             done = True
 
@@ -196,6 +210,8 @@ def run_game(genomes, config):
         for bird in birds:
             screen.blit(IMAGES['player'][bird.index],
                         (bird.x, bird.y))
+
+        showScore(score)
 
         pygame.display.update()
         clock.tick(FPS)
